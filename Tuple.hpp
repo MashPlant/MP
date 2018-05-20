@@ -16,25 +16,29 @@ template <int... Indices, typename... Types>
 struct TupleImpl<std::integer_sequence<int, Indices...>, Types...>
     : EBO<IntT<Indices>, Types>...
 {
-    using MPTag = TupleTag;
-    constexpr static int size = sizeof...(Types);
-
-    template <int Index>
-    constexpr decltype(auto) operator[](IntT<Index>)
-    {
-        return EBOGet<IntT<Index>>(*this);
-    }
-    template <int Index>
-    constexpr decltype(auto) operator[](IntT<Index>) const
-    {
-        return EBOGet<IntT<Index>>(*this);
-    }
 };
 } // namespace detail
 
 template <typename... Types>
-using Tuple = detail::TupleImpl<decltype(std::make_integer_sequence<int, sizeof...(Types)>()),
-                                Types...>;
+struct Tuple
+{
+    using ImplType = detail::TupleImpl<decltype(std::make_integer_sequence<int, sizeof...(Types)>()), Types...>;
+    using MPTag = TupleTag;
+    constexpr static int size = sizeof...(Types);
+    ImplType storage;
+
+    template <int Index>
+    constexpr decltype(auto) operator[](IntT<Index>)
+    {
+        return EBOGet<IntT<Index>>(storage);
+    }
+    template <int Index>
+    constexpr decltype(auto) operator[](IntT<Index>) const
+    {
+        return EBOGet<IntT<Index>>(storage);
+    }
+};
+
 namespace detail
 {
 template <>
@@ -43,7 +47,7 @@ struct MakeImpl<TupleTag>
     template <typename... Types>
     constexpr auto operator()(Types &&... values) const
     {
-        return Tuple<std::decay_t<Types>...>{static_cast<Types>(values)...};
+        return Tuple<std::decay_t<Types>...>{static_cast<Types &&>(values)...};
     }
 };
 template <>
@@ -53,15 +57,62 @@ struct ForEachImpl<TupleTag>
     constexpr void work(Tp &&tuple, F &&f, std::integer_sequence<int, Indices...>) const
     {
         using Dummy = int[];
-        static_cast<void>(Dummy{0, (static_cast<F &&>(f)(tuple[IntT<Indices>{}]), 0)...});
+        static_cast<void>(Dummy{0, (static_cast<F &&>(f)(static_cast<Tp &&>(tuple)[IntT<Indices>{}]), 0)...});
     }
 
     template <typename... Types, typename F>
-    constexpr void operator()(Tuple<Types...> &tuple, F &&f)
+    constexpr void operator()(Tuple<Types...> &&tuple, F &&f) const
+    {
+        work(static_cast<Tuple<Types...> &&>(tuple), static_cast<F &&>(f),
+             std::make_integer_sequence<int, sizeof...(Types)>());
+    }
+
+    template <typename... Types, typename F>
+    constexpr void operator()(Tuple<Types...> &tuple, F &&f) const
     {
         work(tuple, static_cast<F &&>(f),
              std::make_integer_sequence<int, sizeof...(Types)>());
     }
+
+    template <typename... Types, typename F>
+    constexpr void operator()(const Tuple<Types...> &tuple, F &&f) const
+    {
+        work(tuple, static_cast<F &&>(f),
+             std::make_integer_sequence<int, sizeof...(Types)>());
+    }
+};
+template <>
+struct TransformImpl<TupleTag>
+{
+    template <typename Tp, typename F, int... Indices>
+    constexpr auto work(Tp &&tuple, F &&f, std::integer_sequence<int, Indices...>) const
+    {
+        using RetType = Tuple<decltype(static_cast<F &&>(f)(static_cast<Tp &&>(tuple)[IntT<Indices>{}]))...>;
+        return RetType{static_cast<F &&>(f)(static_cast<Tp &&>(tuple)[IntT<Indices>{}])...};
+    }
+    template <typename... Types, typename F>
+    constexpr auto operator()(Tuple<Types...> &&tuple, F &&f) const
+    {
+        return work(static_cast<Tuple<Types...> &&>(tuple), static_cast<F &&>(f),
+                    std::make_integer_sequence<int, sizeof...(Types)>());
+    }
+    template <typename... Types, typename F>
+    constexpr auto operator()(Tuple<Types...> &tuple, F &&f) const
+    {
+        return work(tuple, static_cast<F &&>(f),
+                    std::make_integer_sequence<int, sizeof...(Types)>());
+    }
+    template <typename... Types, typename F>
+    constexpr auto operator()(const Tuple<Types...> &tuple, F &&f) const
+    {
+        return work(tuple, static_cast<F &&>(f),
+                    std::make_integer_sequence<int, sizeof...(Types)>());
+    }
+};
+template <typename... Types>
+struct TypeNameImpl<Tuple<Types...>>
+{
+    constexpr static auto name = "Tuple<"_str + TypeNames<Types...>::name + ">"_str;
 };
 } // namespace detail
 } // namespace mp
