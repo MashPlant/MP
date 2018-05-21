@@ -39,6 +39,13 @@ struct Tuple
     }
 };
 
+template <>
+struct Tuple<>
+{
+    using MPTag = TupleTag;
+    constexpr static int size = 0;
+};
+
 namespace detail
 {
 template <>
