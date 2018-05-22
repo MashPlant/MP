@@ -21,7 +21,7 @@ struct IsValidT
     struct ValidChecker
     {
         template <typename... Args>
-        constexpr auto operator()(Args &&... args) { return impl<F, Args...>(0); }
+        constexpr auto operator()(Args &&... args) const { return impl<F, Args...>(0); }
     };
 
     template <typename F>

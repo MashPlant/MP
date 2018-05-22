@@ -12,6 +12,9 @@ struct TupleTag
 struct IntegerTag
 {
 };
+struct IntegerSeqTag
+{
+};
 struct RangeTag
 {
 };
@@ -20,23 +23,25 @@ struct ListTag
 };
 
 template <typename T>
-using TagOf = typename std::remove_reference_t<T>::MPTag;
+using TagOf = typename std::decay_t<T>::MPTag;
 
+template <typename T>
+constexpr inline bool ValueOf = std::decay_t<T>::value;
+
+template <typename T, typename T_>
+using DecaySame = std::is_same<std::decay_t<T>, std::decay_t<T_>>;
+
+template <typename T, typename T_>
+constexpr inline bool DecaySameV = DecaySame<T, T_>::value;
 } // namespace mp
 
 #include "Make.hpp"
 #include "ForEach.hpp"
 #include "Transform.hpp"
+#include "FindIf.hpp"
 #include "TypeName.hpp"
+#include "IntegerSeq.hpp"
 
-// avoid circular dependency
-namespace mp::detail
-{
-template <char... Chars>
-struct TypeNameImpl<std::integer_sequence<char, Chars...>>
-{
-    constexpr static auto name = "\""_str + std::integer_sequence<char, Chars...>{} + "\"_str"_str;
-};
-} // namespace mp::detail
+#include "BackWardImpl.hpp"
 
 #endif // COMMON_HPP

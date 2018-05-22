@@ -8,17 +8,16 @@ namespace mp
 {
 namespace detail
 {
-
-template <unsigned N, typename = void>
-struct ParseUInt
+template <int N>
+constexpr auto parseInt()
 {
-    constexpr static auto name = ParseUInt<N / 10>::name + std::integer_sequence<char, N % 10 + '0'>{};
-};
-template <unsigned N>
-struct ParseUInt<N, std::enable_if_t<(N < 10)>>
-{
-    constexpr static auto name = std::integer_sequence<char, N + '0'>{};
-};
+    if constexpr (N < 0)
+        return CharSeq<'-'>{} + parseInt<-N>();
+    else if constexpr (N < 10)
+        return CharSeq<N + '0'>{};
+    else
+        return parseInt<N / 10>() + CharSeq<N % 10 + '0'>{};
+}
 
 using namespace mp::literals;
 template <typename T, typename = void> //for SFINAE
@@ -27,18 +26,31 @@ struct TypeNameImpl
     constexpr static auto name = "undefined"_str;
 };
 
-#define BasicTypeName(Type)                       \
-    template <>                                   \
-    struct TypeNameImpl<Type>                     \
-    {                                             \
-        constexpr static auto name = #Type##_str; \
-    };
-
-BasicTypeName(int)
-BasicTypeName(char)
-BasicTypeName(double)
-BasicTypeName(float)
-BasicTypeName(void)
+template <>
+struct TypeNameImpl<int>
+{
+    constexpr static auto name = "int"_str;
+};
+template <>
+struct TypeNameImpl<char>
+{
+    constexpr static auto name = "char"_str;
+};
+template <>
+struct TypeNameImpl<double>
+{
+    constexpr static auto name = "double"_str;
+};
+template <>
+struct TypeNameImpl<float>
+{
+    constexpr static auto name = "float"_str;
+};
+template <>
+struct TypeNameImpl<void>
+{
+    constexpr static auto name = "void"_str;
+};
 
 template <typename T>
 struct TypeNameImpl<const T, typename std::enable_if<!std::is_array<T>::value>::type>
@@ -64,7 +76,7 @@ struct TypeNameImpl<T &&>
 template <typename T, int N>
 struct TypeNameImpl<T[N]>
 {
-    constexpr static auto name = "array["_str + ParseUInt<N>::name +
+    constexpr static auto name = "array["_str + parseInt<N>() +
                                  "] of "_str + TypeNameImpl<T>::name;
 };
 
@@ -89,8 +101,9 @@ struct TypeNames<>
 template <typename Ret, typename... Args>
 struct TypeNameImpl<Ret(Args...)>
 {
+    // C++17 folding expression
     constexpr static auto name = "function ("_str + TypeNames<Args...>::name +
-                                 " return ("_str + TypeNameImpl<Ret>::name;
+                                 ") return "_str + TypeNameImpl<Ret>::name;
 };
 
 } // namespace detail

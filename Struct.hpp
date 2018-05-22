@@ -3,6 +3,7 @@
 
 #include "Common.hpp"
 #include "Tuple.hpp"
+#include "IsValid.hpp"
 
 namespace mp
 {
@@ -42,6 +43,42 @@ constexpr auto members(Struct &&object)
         return pair[IntT<1>{}].get(static_cast<Struct &&>(object));
     });
 }
+
+template <typename S>
+struct Struct
+{
+    decltype(::mp::members(*(S *)0)) members;
+
+    constexpr Struct(S &object) : members(::mp::members(object)) {}
+
+    template <typename Name>
+    constexpr decltype(auto) get(Name) const
+    {
+        constexpr auto pos = findIf(S::Accessor::get(), [](auto &x) -> DecaySame<decltype(x[IntT<0>{}]), Name> {});
+        static_assert(pos.value != -1, "No such field");
+        return members[pos];
+    }
+
+    template <typename F, int Cur = 0>
+    constexpr void dynApply(const char *name, F &&f) const
+    {
+        constexpr auto info = S::Accessor::get();
+        constexpr auto canApply = isValid([](auto &&x) -> decltype(static_cast<F &&>(f)(x)) {});
+        if constexpr (Cur == info.size)
+            return;
+        else
+        {
+            if (info[IntT<Cur>{}][IntT<0>{}] == name)
+            {
+                if constexpr (ValueOf<decltype(canApply(members[IntT<Cur>{}]))>)
+                    static_cast<F &&>(f)(members[IntT<Cur>{}]);
+                return;
+            }
+            else
+                dynApply<F, Cur + 1>(name, static_cast<F &&>(f));
+        }
+    }
+};
 
 #define FwdConcat(a, b) FwdConcat_(a, b)
 #define FwdConcat_(a, b) a##b

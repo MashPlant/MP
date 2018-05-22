@@ -93,8 +93,28 @@ constexpr auto operator>=(IntegerT<Int, Value>, IntegerT<Int, Value_>)
     return BoolT<(Value >= Value_)>{};
 }
 
-} // namespace mp
+namespace detail
+{
+template <int N>
+constexpr int parse(const char (&arr)[N])
+{
+    int cur = 0, sgn = 1, ret = 0;
+    if (arr[0] == '-')
+        sgn = -1, cur = 1;
+    for (; cur < N; ++cur)
+        ret = ret * 10 + (arr[cur] - '0');
+    return ret * sgn;
+}
+} // namespace detail
 
-#include "AtoI.hpp"
+namespace literals
+{
+template <char... Chars>
+constexpr auto operator"" _t()
+{
+    return IntT<detail::parse<sizeof...(Chars)>({Chars...})>{};
+}
+} // namespace literals
+} // namespace mp
 
 #endif // INTEGERT_HPP
